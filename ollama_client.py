@@ -7,11 +7,20 @@ class OllamaClientError(Exception):
     pass
 
 
-def chat(prompt: str, model: str = DEFAULT_MODEL) -> str:
+def chat(
+    prompt: str,
+    model: str = DEFAULT_MODEL,
+    system_prompt: str | None = None,
+) -> str:
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
     try:
         response = ollama.chat(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
         )
     except ConnectionError as exc:
         raise OllamaClientError(
