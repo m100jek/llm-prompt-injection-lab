@@ -8,7 +8,8 @@ Research project focused on:
 - Tool Abuse
 - Defensive Techniques
 
-**Goal:** Measure effectiveness of prompt injection attacks against LLM-powered applications.
+Goal:
+Measure effectiveness of prompt injection attacks against LLM-powered applications.
 
 ## Requirements
 
