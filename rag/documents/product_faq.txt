@@ -1,0 +1,13 @@
+Product FAQ
+
+Q: What is the return window?
+A: Customers can return unused items within 30 days of purchase.
+
+Q: How do I contact support?
+A: Open a ticket in the customer portal or email support@example.com.
+
+Q: Do you offer international shipping?
+A: Yes, shipping is available to most countries with tracked delivery.
+
+Q: How long does a refund take?
+A: Approved refunds are processed within 5 to 7 business days.

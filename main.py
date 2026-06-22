@@ -1,4 +1,5 @@
-from ollama_client import DEFAULT_MODEL, OllamaClientError, chat
+from config import DEFAULT_MODEL
+from ollama_client import OllamaClientError, chat
 
 
 def main() -> None:
