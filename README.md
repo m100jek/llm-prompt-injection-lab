@@ -49,6 +49,8 @@ Each prompt is sent as an independent request (no conversation history), which m
 
 Automated attack runs use categorized JSON scenarios, a default system prompt, and optional keyword-based RAG for indirect injection.
 
+Scenarios follow a **black-box** model: attack payloads do not assume knowledge of the system prompt, secret values, or application internals. Only the lab configuration in `config.py` defines the ground truth for later evaluation.
+
 ```bash
 py run_attacks.py
 py run_attacks.py --attacks scenarios/direct.json
