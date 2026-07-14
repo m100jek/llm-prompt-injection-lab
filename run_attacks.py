@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 from attack_runner import AttackLoadError, run_attacks
+from evaluator import print_summary, summarize_results
 from config import DEFAULT_ATTACKS_PATH, DEFAULT_LLM_HOST, DEFAULT_PROVIDER, DEFAULT_SYSTEM_PROMPT
 from config import DEFAULT_MODEL
 
@@ -51,7 +52,7 @@ def main() -> None:
             host=args.host,
             model=args.model,
         )
-        output_path, attack_count = run_attacks(
+        output_path, results = run_attacks(
             attacks_path=args.attacks,
             output_path=args.output,
             system_prompt=DEFAULT_SYSTEM_PROMPT,
@@ -64,8 +65,9 @@ def main() -> None:
         print(f"Error: {exc}")
         raise SystemExit(1) from exc
 
-    print(f"Completed {attack_count} attacks")
+    print(f"Completed {len(results)} attacks")
     print(f"Results saved to: {output_path}")
+    print_summary(summarize_results(results))
 
 
 if __name__ == "__main__":

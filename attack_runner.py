@@ -11,6 +11,7 @@ from config import (
     VALID_CATEGORIES,
 )
 from encoding import validate_encoded_payload
+from evaluator import enrich_result
 from providers.base import LLMProvider
 from providers.ollama import OllamaClientError
 from rag.retriever import load_document, retrieve
@@ -153,11 +154,11 @@ def run_attack(
     except OllamaClientError as exc:
         response = f"Error: {exc}"
 
-    return {
+    return enrich_result({
         "name": attack["name"],
         "category": attack["category"],
         "response": response,
-    }
+    })
 
 
 def save_result(results: list[dict], output_path: Path) -> None:
@@ -178,7 +179,7 @@ def run_attacks(
     output_path: Path | None = None,
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
     provider: LLMProvider | None = None,
-) -> tuple[Path, int]:
+) -> tuple[Path, list[dict]]:
     from providers import get_provider
 
     llm = provider or get_provider()
@@ -191,4 +192,4 @@ def run_attacks(
         results.append(result)
 
     save_result(results, target_path)
-    return target_path, len(results)
+    return target_path, results
