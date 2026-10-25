@@ -1,9 +1,10 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from config import (
     DEFAULT_ATTACKS_PATH,
+    DEFAULT_DB_PATH,
     DEFAULT_SYSTEM_PROMPT,
     RAG_DOCUMENTS_DIR,
     RAG_TOP_K,
@@ -11,7 +12,7 @@ from config import (
     VALID_CATEGORIES,
 )
 from encoding import validate_encoded_payload
-from evaluator import enrich_result
+from evaluator import enrich_result, summarize_results
 from providers.base import LLMProvider
 from providers.ollama import OllamaClientError
 from rag.retriever import load_document, retrieve
@@ -45,6 +46,12 @@ def _parse_attack(item: dict, index: int, seen_names: set[str]) -> dict:
         "category": category,
         "prompt": prompt,
     }
+
+    evaluation = item.get("evaluation")
+    if evaluation is not None:
+        if not isinstance(evaluation, dict):
+            raise AttackLoadError(f"Attack '{name}' has an invalid 'evaluation' block")
+        attack["evaluation"] = evaluation
 
     if category == "indirect":
         rag_query = item.get("rag_query")
@@ -110,7 +117,7 @@ def prepare_attack_prompt(attack: dict) -> str:
     category = attack["category"]
     prompt = attack["prompt"]
 
-    if category in {"direct", "role_confusion", "encoding"}:
+    if category in {"direct", "role_confusion", "encoding", "benign"}:
         return prompt
 
     if category == "indirect":
@@ -154,11 +161,14 @@ def run_attack(
     except OllamaClientError as exc:
         response = f"Error: {exc}"
 
-    return enrich_result({
-        "name": attack["name"],
-        "category": attack["category"],
-        "response": response,
-    })
+    return enrich_result(
+        {
+            "name": attack["name"],
+            "category": attack["category"],
+            "response": response,
+        },
+        attack=attack,
+    )
 
 
 def save_result(results: list[dict], output_path: Path) -> None:
@@ -179,17 +189,58 @@ def run_attacks(
     output_path: Path | None = None,
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
     provider: LLMProvider | None = None,
-) -> tuple[Path, list[dict]]:
+    db_path: Path | None = DEFAULT_DB_PATH,
+    run_meta: dict | None = None,
+) -> tuple[Path, list[dict], str | None]:
     from providers import get_provider
 
     llm = provider or get_provider()
     attacks = load_all_attacks(attacks_path)
     target_path = output_path or default_output_path()
+    started_at = datetime.now(timezone.utc).isoformat()
 
     results = []
     for attack in attacks:
         result = run_attack(attack, llm, system_prompt)
         results.append(result)
 
+    finished_at = datetime.now(timezone.utc).isoformat()
     save_result(results, target_path)
-    return target_path, results
+
+    experiment_id = None
+    if db_path is not None:
+        try:
+            from history.db import HistoryError, save_experiment
+
+            summary = summarize_results(results)
+            meta = {
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "model": getattr(llm, "model", None),
+                "host": getattr(llm, "host", None),
+                "provider": (run_meta or {}).get("provider"),
+                "scenarios_total": summary["total"],
+                "compromises": summary["compromised"],
+                "failed": summary["failed"],
+                "inconclusive": summary["inconclusive"],
+                "attack_success_rate": summary["attack_success_rate"],
+                "task_success_rate": summary["task_success_rate"],
+                "category_summary": summary["by_category"],
+                "config": {
+                    "attacks_path": str(attacks_path),
+                    "model": getattr(llm, "model", None),
+                    "host": getattr(llm, "host", None),
+                    "provider": (run_meta or {}).get("provider"),
+                },
+            }
+            if run_meta:
+                for key in ("model", "host", "provider"):
+                    if run_meta.get(key) is not None:
+                        meta[key] = run_meta[key]
+                        meta["config"][key] = run_meta[key]
+
+            experiment_id = save_experiment(db_path, meta, results)
+        except HistoryError as exc:
+            print(f"Warning: could not save experiment history: {exc}")
+
+    return target_path, results, experiment_id

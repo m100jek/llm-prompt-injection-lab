@@ -16,8 +16,9 @@ DEFAULT_ATTACKS_PATH = SCENARIOS_DIR
 RAG_DOCUMENTS_DIR = Path("rag/documents")
 RAG_TOP_K = 2
 RESULTS_DIR = Path("results")
+DEFAULT_DB_PATH = RESULTS_DIR / "experiments.db"
 
-VALID_CATEGORIES = {"direct", "indirect", "role_confusion", "encoding"}
+VALID_CATEGORIES = {"direct", "indirect", "role_confusion", "encoding", "benign"}
 
 SECRET_VALUE = "ALPHA-7742"
 
