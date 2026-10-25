@@ -172,11 +172,54 @@ Indirect attacks retrieve chunks from `rag/documents/` using keyword overlap. Po
 
 Encoded payloads are sent to the model without decoding on the runner side. The `encoding` field (`base64`, `rot13`, `hex`) describes the payload format only.
 
-### Remote LLM host
+### Providers
 
-Use `--host` to target Ollama on another machine in your network. The runner normalizes values such as `192.168.1.50` to `http://192.168.1.50:11434`.
+#### Ollama (default)
 
-LLM access is abstracted in `providers/` so additional backends can be added later. Only `ollama` is implemented today.
+```bash
+py run_attacks.py --provider ollama --model llama3.2
+py run_attacks.py --host 192.168.1.50
+```
+
+`--host` for Ollama accepts an IP or URL. Bare IPs are normalized to `http://IP:11434`.
+
+#### OpenAI-compatible Chat Completions API
+
+Test a model behind an authorized HTTP endpoint that speaks the OpenAI Chat Completions format.
+
+```bash
+# Windows PowerShell
+$env:LLM_API_KEY = "your-api-key"
+py run_attacks.py --provider openai-compatible --host https://api.example.com/v1/chat/completions --model my-model
+```
+
+```bash
+# Linux / macOS
+export LLM_API_KEY=your-api-key
+py run_attacks.py --provider openai-compatible --host https://api.example.com/v1/chat/completions --model my-model
+```
+
+`--host` is the **exact** endpoint URL used for POST. The tool does not rewrite or append paths such as `/v1/chat/completions`. Pass whatever chat URL your provider documents (OpenAI-style, custom gateway path, etc.).
+
+API key is read from the `LLM_API_KEY` environment variable (never from CLI args). Optional extra headers:
+
+```bash
+$env:LLM_EXTRA_HEADERS = '{"X-Custom-Header":"value"}'
+```
+
+Request body shape:
+
+```json
+{"model": "my-model", "messages": [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]}
+```
+
+Response parsing uses `choices[0].message.content`.
+
+Supported now: non-streaming text chat completions. Not supported: streaming, tool/function calling, multimodal input.
+
+HTTP/connection/timeout/invalid-response errors are recorded as inconclusive scenario results (`Error: ...`) and do not count as successful attacks. TLS verification is on; redirects are not followed. API keys are never written to JSON exports or SQLite history.
+
+**Warning:** Only test endpoints you are authorized to test. Cloud APIs may incur costs.
 
 ### Tests
 
@@ -184,7 +227,7 @@ LLM access is abstracted in `providers/` so additional backends can be added lat
 py -m unittest discover -s tests -v
 ```
 
-Tests do not require a running Ollama instance.
+Tests do not require a running Ollama instance, internet access, or a real API key.
 
 ## Roadmap
 
@@ -193,5 +236,6 @@ Tests do not require a running Ollama instance.
 | 1 | Minimal REPL + Ollama (`llama3.2`) |
 | 2 | System prompt + automated attack runner |
 | 3-4 | Scenario catalog, RAG indirect injection, role confusion, encoding, remote host |
-| 5 (current) | Structured evaluation criteria, metrics, SQLite experiment history |
-| 6 | Optional FastAPI + simple UI |
+| 5 | Structured evaluation criteria, metrics, SQLite experiment history |
+| 6 (current) | OpenAI-compatible API provider for remote LLM endpoints |
+| 7 | Optional FastAPI + simple UI |

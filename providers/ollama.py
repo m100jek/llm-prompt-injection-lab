@@ -2,9 +2,10 @@ import ollama
 from ollama import Client
 
 from config import DEFAULT_LLM_HOST, DEFAULT_MODEL, normalize_host
+from providers.errors import ProviderError
 
 
-class OllamaClientError(Exception):
+class OllamaClientError(ProviderError):
     pass
 
 

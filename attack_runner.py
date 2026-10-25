@@ -14,7 +14,7 @@ from config import (
 from encoding import validate_encoded_payload
 from evaluator import enrich_result, summarize_results
 from providers.base import LLMProvider
-from providers.ollama import OllamaClientError
+from providers.errors import ProviderError
 from rag.retriever import load_document, retrieve
 
 
@@ -158,7 +158,7 @@ def run_attack(
 
     try:
         response = provider.chat(prepared_prompt, system_prompt=system_prompt)
-    except OllamaClientError as exc:
+    except ProviderError as exc:
         response = f"Error: {exc}"
 
     return enrich_result(

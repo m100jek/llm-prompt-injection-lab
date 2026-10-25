@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 from attack_runner import AttackLoadError, run_attacks
@@ -9,9 +10,12 @@ from config import (
     DEFAULT_MODEL,
     DEFAULT_PROVIDER,
     DEFAULT_SYSTEM_PROMPT,
+    LLM_API_KEY_ENV,
+    LLM_EXTRA_HEADERS_ENV,
 )
 from evaluator import print_summary, summarize_results
 from history.db import HistoryError, get_experiment, list_experiments
+from providers.errors import ProviderError
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,7 +37,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--host",
         default=DEFAULT_LLM_HOST,
-        help="LLM host URL or IP (default: http://127.0.0.1:11434)",
+        help=(
+            "Ollama host/IP (default: http://127.0.0.1:11434) or "
+            "OpenAI-compatible exact chat API endpoint URL"
+        ),
     )
     parser.add_argument(
         "--model",
@@ -43,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--provider",
         default=DEFAULT_PROVIDER,
-        help="LLM provider (default: ollama)",
+        help="LLM provider: ollama or openai-compatible (default: ollama)",
     )
     parser.add_argument(
         "--db",
@@ -150,13 +157,32 @@ def main() -> None:
         return
 
     try:
+        from config import normalize_host
         from providers import get_provider
+        from providers.openai_compatible import (
+            parse_extra_headers,
+            validate_api_endpoint_url,
+        )
+
+        api_key = None
+        extra_headers = None
+        if args.provider in {"openai-compatible", "openai_compatible"}:
+            api_key = os.environ.get(LLM_API_KEY_ENV)
+            extra_headers = parse_extra_headers(
+                os.environ.get(LLM_EXTRA_HEADERS_ENV)
+            )
+            persisted_host = validate_api_endpoint_url(args.host)
+        else:
+            persisted_host = normalize_host(args.host)
 
         provider = get_provider(
             provider=args.provider,
             host=args.host,
             model=args.model,
+            api_key=api_key,
+            extra_headers=extra_headers,
         )
+
         output_path, results, experiment_id = run_attacks(
             attacks_path=args.attacks,
             output_path=args.output,
@@ -165,14 +191,14 @@ def main() -> None:
             db_path=args.db,
             run_meta={
                 "provider": args.provider,
-                "host": args.host,
+                "host": persisted_host,
                 "model": args.model,
             },
         )
     except AttackLoadError as exc:
         print(f"Error: {exc}")
         raise SystemExit(1) from exc
-    except NotImplementedError as exc:
+    except (NotImplementedError, ValueError, ProviderError) as exc:
         print(f"Error: {exc}")
         raise SystemExit(1) from exc
 
